@@ -1,0 +1,14 @@
+node_modules/
+.env
+queue.json
+logs/
+*.log
+diag-*.js
+test-*.js
+check-*.js
+debug.js
+temp/
+.git/
+.vscode/
+.idea/
+*.local

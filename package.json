@@ -1,0 +1,33 @@
+{
+    "name": "predictive-dialer-v3",
+    "version": "1.0.0",
+    "description": "Predictive dialer service with AmoCRM and OnlinePBX integration",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "nodemon index.js"
+    },
+    "keywords": [
+        "predictive-dialer",
+        "amocrm",
+        "onlinepbx",
+        "telephony",
+        "autodialer"
+    ],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "axios": "^1.7.9",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "winston": "^3.19.0",
+        "ws": "^8.18.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.9"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

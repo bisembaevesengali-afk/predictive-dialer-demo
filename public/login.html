@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в систему</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            sidebar: '#0B1120',
+                            bg: '#F3F4F6',
+                            teal: '#14B8A6',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 flex items-center justify-center h-screen">
+
+    <div class="bg-white p-10 rounded-3xl shadow-xl w-full max-w-md border border-slate-100 flex flex-col gap-6">
+        <div class="text-center">
+            <div
+                class="w-16 h-16 bg-teal-500 rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg shadow-teal-500/30 mx-auto mb-6">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+            <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Добро пожаловать</h1>
+            <p class="text-slate-400 font-medium text-sm mt-2">Войдите в систему для начала работы</p>
+        </div>
+
+        <!-- QUICK LOGIN (Hidden by default) -->
+        <div id="quickLoginCard" class="hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-4 cursor-pointer hover:border-teal-500 hover:shadow-md transition-all group"
+                onclick="quickLogin()">
+                <img id="quickAvatar" src="" class="w-12 h-12 rounded-full bg-white shadow-sm border-2 border-white">
+                <div class="flex-1">
+                    <p class="text-[10px] uppercase font-bold text-slate-400 mb-0.5">Продолжить как</p>
+                    <p id="quickName"
+                        class="font-bold text-slate-800 text-lg leading-none group-hover:text-teal-600 transition-colors">
+                        Name</p>
+                </div>
+                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center text-teal-500 shadow-sm">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </div>
+            <div class="text-center mt-4 relative">
+                <span class="bg-white px-3 relative z-10 text-[10px] font-bold text-slate-300 uppercase">Или выберите
+                    другого</span>
+                <div class="absolute top-1/2 left-0 w-full h-px bg-slate-100 -z-0"></div>
+            </div>
+        </div>
+
+        <!-- CUSTOM MANAGER SELECT -->
+        <div class="relative z-20">
+            <label
+                class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Сотрудник</label>
+
+            <!-- Dropdown Trigger -->
+            <button id="dropdownTrigger" onclick="toggleDropdown()"
+                class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 flex items-center justify-between font-bold text-slate-500 hover:border-teal-500 hover:text-slate-700 hover:shadow-md transition-all group outline-none focus:ring-2 focus:ring-teal-500/20">
+                <span id="triggerText" class="flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-full bg-slate-200 block"></span>
+                    Выберите пользователя...
+                </span>
+                <i id="dropdownArrow"
+                    class="fa-solid fa-chevron-down text-slate-300 group-hover:text-teal-500 transition-transform duration-300"></i>
+            </button>
+
+            <!-- Dropdown Options -->
+            <div id="dropdownMenu"
+                class="hidden absolute top-full left-0 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+                <!-- Search within dropdown -->
+                <div class="p-2 border-b border-slate-50 bg-slate-50/50">
+                    <div class="relative">
+                        <input type="text" id="managerSearch" oninput="filterManagers(this.value)"
+                            placeholder="Поиск менеджера..."
+                            class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all pl-8">
+                        <i
+                            class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+                    </div>
+                </div>
+                <div id="managersList" class="max-h-60 overflow-y-auto divide-y divide-slate-50">
+                    <!-- Options will be injected here -->
+                </div>
+            </div>
+        </div>
+
+        <button onclick="loginFromSelection()"
+            class="w-full bg-teal-500 text-white font-black uppercase py-4 rounded-2xl shadow-lg shadow-teal-500/20 hover:bg-teal-600 active:scale-[0.98] transition-all relative overflow-hidden group">
+            <span class="relative z-10">Войти в систему</span>
+            <div
+                class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+            </div>
+        </button>
+
+        <p class="text-center text-[10px] font-bold text-slate-300 uppercase mt-4">v3.0.0 Alpha</p>
+    </div>
+
+    <script>
+        // State
+        let managers = [];
+        let selectedUser = null;
+        const lastUser = JSON.parse(localStorage.getItem('lastKnownUser'));
+        const listContainer = document.getElementById('managersList');
+
+        // Init
+        async function init() {
+            try {
+                // Check Last User UI
+                if (lastUser) {
+                    document.getElementById('quickLoginCard').classList.remove('hidden');
+                    document.getElementById('quickName').innerText = lastUser.name;
+                    document.getElementById('quickAvatar').src = lastUser.avatar;
+                }
+
+                // Load Real Users
+                const res = await fetch('/api/users');
+                if (!res.ok) throw new Error('Failed to load users');
+
+                managers = await res.json();
+                renderDropdown(managers);
+
+            } catch (e) {
+                console.error(e);
+                listContainer.innerHTML = `<div class="p-4 text-center text-red-500 text-xs font-bold">Не удалось загрузить список пользователей.<br>Проверьте сервер.</div>`;
+            }
+        }
+
+        // --- RENDER CUSTOM DROPDOWN ---
+        function renderDropdown(users) {
+            listContainer.innerHTML = '';
+            if (users.length === 0) {
+                listContainer.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs">Ничего не найдено</div>`;
+                return;
+            }
+            users.forEach(mgr => {
+                const item = document.createElement('div');
+                item.className = "p-3 flex items-center gap-3 cursor-pointer hover:bg-teal-50 transition-colors group";
+                item.onclick = () => selectUser(mgr);
+                item.innerHTML = `
+                    <img src="${mgr.avatar}" class="w-10 h-10 rounded-full bg-white shadow-sm border border-slate-100">
+                    <div>
+                        <p class="text-sm font-bold text-slate-700 group-hover:text-teal-700">${mgr.name}</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">${mgr.email}</p>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        // Search logic
+        function filterManagers(query) {
+            const filtered = managers.filter(m =>
+                m.name.toLowerCase().includes(query.toLowerCase()) ||
+                m.email.toLowerCase().includes(query.toLowerCase())
+            );
+            renderDropdown(filtered);
+        }
+
+        // --- ACTIONS ---
+
+        function toggleDropdown() {
+            const menu = document.getElementById('dropdownMenu');
+            const arrow = document.getElementById('dropdownArrow');
+
+            menu.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+
+            if (!menu.classList.contains('hidden')) {
+                // Focus search input when opening
+                setTimeout(() => document.getElementById('managerSearch').focus(), 100);
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const trigger = document.getElementById('dropdownTrigger');
+            const menu = document.getElementById('dropdownMenu');
+            if (!trigger.contains(e.target) && !menu.contains(e.target)) {
+                menu.classList.add('hidden');
+                document.getElementById('dropdownArrow').classList.remove('rotate-180');
+            }
+        });
+
+        function selectUser(user) {
+            selectedUser = user;
+
+            // Update Trigger UI
+            const triggerText = document.getElementById('triggerText');
+            triggerText.innerHTML = `
+                <img src="${user.avatar}" class="w-8 h-8 rounded-full border border-slate-200">
+                <span class="text-slate-800">${user.name}</span>
+            `;
+            triggerText.parentElement.classList.add('border-teal-500', 'ring-1', 'ring-teal-500/20');
+
+            toggleDropdown(); // Close menu
+        }
+
+        function login(user) {
+            if (!user) return;
+            localStorage.setItem('currentUser', JSON.stringify(user));
+            localStorage.setItem('lastKnownUser', JSON.stringify(user));
+
+            // Animation before redirect
+            const btn = document.querySelector('button[onclick="loginFromSelection()"]');
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ВХОД...';
+                btn.classList.add('opacity-80', 'pointer-events-none');
+            }
+
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 500);
+        }
+
+        function quickLogin() {
+            if (lastUser) login(lastUser);
+        }
+
+        function loginFromSelection() {
+            if (selectedUser) {
+                login(selectedUser);
+            } else {
+                // Shake animation for error
+                const trigger = document.getElementById('dropdownTrigger');
+                trigger.classList.add('animate-pulse', 'border-red-400');
+                setTimeout(() => trigger.classList.remove('animate-pulse', 'border-red-400'), 500);
+            }
+        }
+
+        // Запуск загрузки
+        init();
+    </script>
+</body>
+
+</html>
