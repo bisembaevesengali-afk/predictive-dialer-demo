@@ -9,13 +9,19 @@ let currentUser = null;
 function checkAuth() {
     const userStr = localStorage.getItem('currentUser');
     if (!userStr) {
-        // ДЛЯ ДЕМО: Если мы на Render или localhost, создаем демо-пользователя автоматически
+        // ДЛЯ ДЕМО: Если мы на Render, просто создаем демо-пользователя, чтобы не мучать менеджеров входом
         if (window.location.hostname.includes('render') || window.location.hostname.includes('localhost')) {
             currentUser = { id: 7751419, name: 'Demo Manager', extension: '101', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Demo' };
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
             console.log('Demo auto-login successful');
+            // Если мы уже на /login.html, перекидываем на главную
+            if (window.location.pathname.includes('login.html')) {
+                window.location.href = '/';
+            }
         } else {
-            window.location.href = '/login.html';
+            if (!window.location.pathname.includes('login.html')) {
+                window.location.href = '/login.html';
+            }
             return;
         }
     } else {
