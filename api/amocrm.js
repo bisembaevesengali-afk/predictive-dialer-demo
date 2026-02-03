@@ -35,16 +35,6 @@ class AmoCRM {
         }
     }
 
-    async getGroups() {
-        try {
-            const response = await this.axios.get('/users/groups');
-            return response.data._embedded.groups;
-        } catch (error) {
-            console.error('Error fetching groups:', error.message);
-            return [];
-        }
-    }
-
     async getPipelines() {
         try {
             const response = await this.axios.get('/leads/pipelines');
@@ -55,17 +45,47 @@ class AmoCRM {
         }
     }
 
-    async findLeadsByStatus(statusId = null, pipelineId = null, responsibleUserId = null, limit = 50) {
+    async getLeadById(leadId) {
+        try {
+            const response = await this.axios.get(`/leads/${leadId}?with=contacts`);
+            const lead = response.data;
+            const contact = await this.getMainContact(lead._embedded?.contacts || []);
+            return {
+                id: lead.id,
+                name: lead.name,
+                price: lead.price || 0,
+                status_id: lead.status_id,
+                pipeline_id: lead.pipeline_id,
+                responsible_user_id: lead.responsible_user_id,
+                created_at: lead.created_at || lead.createdAt || 0,
+                created_at_formatted: new Date((lead.created_at || lead.createdAt || 0) * 1000).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: '2-digit' }) + ' г.',
+                updated_at: lead.updated_at || lead.updatedAt || 0,
+                contactName: contact?.name || lead.name || 'Без имени',
+                phone: contact?.phone || null,
+                link: `https://${config.amocrm.subdomain}.amocrm.ru/leads/detail/${lead.id}`,
+                custom_fields_values: lead.custom_fields_values || [],
+                tags: lead._embedded?.tags || []
+            };
+        } catch (error) {
+            console.error('Error fetching lead by ID:', error.message);
+            return null;
+        }
+    }
+
+    // Fetch leads with filters
+    async findLeadsByStatus(statusId = null, pipelineId = null, userId = null, limit = 50) {
         try {
             let url = `/leads?limit=${limit}&with=contacts`;
+
+            // Фильтры
             if (statusId && statusId !== 'all') {
                 url += `&filter[statuses][0][status_id]=${statusId}`;
             }
             if (pipelineId && pipelineId !== 'all') {
-                url += `&filter[statuses][0][pipeline_id]=${pipelineId}`;
+                url += `&filter[pipeline_id][0]=${pipelineId}`;
             }
-            if (responsibleUserId) {
-                url += `&filter[responsible_user_id]=${responsibleUserId}`;
+            if (userId && userId !== 'all') {
+                url += `&filter[responsible_user_id][0]=${userId}`;
             }
 
             const response = await this.axios.get(url);
@@ -74,66 +94,49 @@ class AmoCRM {
 
             const leads = response.data._embedded.leads;
 
-            // 1. Собираем ID всех контактов из всех сделок
-            const contactIds = [...new Set(leads.flatMap(lead =>
-                (lead._embedded?.contacts || []).map(c => c.id)
-            ))];
-
-            // 2. Пакетная загрузка контактов (макс. 50 за раз)
-            const contactsData = await this.getContactsBulk(contactIds);
-
-            // 3. Форматируем сделки, сопоставляя их с загруженными контактами
-            const formattedLeads = leads.map(lead => {
-                const leadContactId = lead._embedded?.contacts?.[0]?.id;
-                const contactInfo = contactsData[leadContactId] || null;
-
+            // Format leads for Dialer
+            const formattedLeads = await Promise.all(leads.map(async (lead) => {
+                const contact = await this.getMainContact(lead._embedded?.contacts || []);
                 return {
                     id: lead.id,
                     name: lead.name,
-                    price: lead.price,
+                    price: lead.price || 0,
                     status_id: lead.status_id,
-                    contactName: contactInfo?.name || lead.name || 'Unknown',
-                    phone: contactInfo?.phone || null,
+                    pipeline_id: lead.pipeline_id,
+                    responsible_user_id: lead.responsible_user_id,
+                    created_at: lead.created_at || lead.createdAt || 0,
+                    created_at_formatted: new Date((lead.created_at || lead.createdAt || 0) * 1000).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: '2-digit' }) + ' г.',
+                    contactName: contact?.name || lead.name || 'Без имени',
+                    phone: contact?.phone || null,
                     link: `https://${config.amocrm.subdomain}.amocrm.ru/leads/detail/${lead.id}`
                 };
-            });
+            }));
 
-            // Возвращаем все сделки (фильтрация только по наличию телефона не обязательна здесь)
-            return formattedLeads;
+            // Filter out leads without phone numbers
+            return formattedLeads.filter(l => l.phone);
         } catch (error) {
             console.error('Error finding leads:', error.response?.data || error.message);
             return [];
         }
     }
 
-    /**
-     * Пакетная загрузка контактов по ID для экономии лимитов API.
-     */
-    async getContactsBulk(ids) {
-        if (!ids || ids.length === 0) return {};
-
+    async getMainContact(contacts) {
+        if (!contacts || !contacts.length) return null;
         try {
-            const result = {};
-            // Если контактов много, бьем на пачки по 50
-            for (let i = 0; i < ids.length; i += 50) {
-                const chunk = ids.slice(i, i + 50);
-                const filter = chunk.map(id => `filter[id][]=${id}`).join('&');
-                const response = await this.axios.get(`/contacts?${filter}`);
+            const contactId = contacts[0].id;
+            const response = await this.axios.get(`/contacts/${contactId}`);
+            const contact = response.data;
 
-                if (response.data && response.data._embedded) {
-                    response.data._embedded.contacts.forEach(c => {
-                        const phoneField = c.custom_fields_values?.find(f => f.field_code === 'PHONE');
-                        result[c.id] = {
-                            name: c.name,
-                            phone: phoneField ? phoneField.values[0].value : null
-                        };
-                    });
-                }
-            }
-            return result;
+            const phoneField = contact.custom_fields_values?.find(f => f.field_code === 'PHONE' || f.field_id === 1057329 || f.field_name?.toUpperCase() === 'ТЕЛЕФОН');
+            const phone = phoneField?.values?.[0]?.value || null;
+
+            return {
+                name: contact.name || 'Без имени',
+                phone: phone
+            };
         } catch (error) {
-            console.error('Bulk contacts fetch failed:', error.message);
-            return {};
+            console.error(`Contact fetch error for ID ${contacts[0].id}:`, error.message);
+            return null;
         }
     }
 }
