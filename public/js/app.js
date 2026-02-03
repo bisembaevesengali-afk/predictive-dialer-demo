@@ -470,10 +470,17 @@ window.changeSort = function (type) {
     currentSort = type;
     applySorting();
     renderQueue();
+    renderSearchResults();
 }
 
 function applySorting() {
-    queue.sort((a, b) => currentSort === 'newest' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp);
+    const sortFn = (a, b) => {
+        const tsA = a.timestamp || a.created_at || a.createdAt || 0;
+        const tsB = b.timestamp || b.created_at || b.createdAt || 0;
+        return currentSort === 'newest' ? tsB - tsA : tsA - tsB;
+    };
+    queue.sort(sortFn);
+    filteredResults.sort(sortFn);
 }
 
 window.resetFilters = function () {
@@ -564,6 +571,7 @@ window.applyFilters = async function () {
         document.getElementById('callHistoryView').classList.add('hidden');
         document.getElementById('searchResultsView').classList.remove('hidden');
 
+        applySorting();
         renderSearchResults();
         updateSearchSummary();
     } catch (e) {
@@ -684,7 +692,10 @@ function renderQueue() {
     const sortedList = [...queue].sort((a, b) => {
         const priority = { 'dialing': 0, 'pending': 1, 'talked': 2, 'no-answer': 2 };
         if (priority[a.status] !== priority[b.status]) return priority[a.status] - priority[b.status];
-        return b.timestamp - a.timestamp;
+
+        const tsA = a.timestamp || a.created_at || a.createdAt || 0;
+        const tsB = b.timestamp || b.created_at || b.createdAt || 0;
+        return currentSort === 'newest' ? tsB - tsA : tsA - tsB;
     });
 
     const pendingCount = queue.filter(l => l.status === 'pending' || l.status === 'dialing').length;
