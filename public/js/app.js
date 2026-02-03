@@ -121,6 +121,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (pauseBtn) pauseBtn.onclick = () => pauseSimulation();
     if (stopBtn) stopBtn.onclick = () => stopSimulation();
 
+    // КЛИК ПО ПОИСКУ ОТКРЫВАЕТ ФИЛЬТРЫ
+    if (searchInput && filterPanel) {
+        searchInput.onclick = (e) => {
+            e.stopPropagation();
+            filterPanel.classList.toggle('hidden');
+            suggestions.classList.add('hidden');
+        };
+        searchInput.oninput = (e) => handleLiveSearch(e.target.value);
+        searchInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                applyFilters();
+                suggestions.classList.add('hidden');
+            }
+        };
+    }
+
     if (filterBtn && filterPanel) {
         filterBtn.onclick = (e) => {
             e.stopPropagation();
@@ -135,20 +151,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 suggestions.classList.add('hidden');
             }
         });
-    }
-
-    if (searchInput) {
-        searchInput.onclick = (e) => {
-            e.stopPropagation();
-            if (searchInput.value.length > 0) suggestions.classList.remove('hidden');
-        };
-        searchInput.oninput = (e) => handleLiveSearch(e.target.value);
-        searchInput.onkeydown = (e) => {
-            if (e.key === 'Enter') {
-                applyFilters();
-                suggestions.classList.add('hidden');
-            }
-        };
     }
 
     if (addBtn) {
@@ -176,10 +178,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 2. Только теперь делаем запросы и рендерим данные
     if (!currentUser) return;
 
-    loadAmoPipelines().then(() => console.log('Pipelines loaded'));
+    loadAmoPipelines().then(() => console.log('Pipelines & Users loaded'));
 
-    // Заполняем очередь демо-данными для примера
-    queue = [...leadPool];
+    // Заполняем очередь демо-данными для примера (если пустая)
+    if (queue.length === 0) queue = [...leadPool];
 
     applySorting();
     renderQueue();
@@ -187,25 +189,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (queue.length > 0) showLeadDetails(queue[0]);
 });
 
-// --- ОСТАЛЬНЫЕ ФУНКЦИИ (Оставляем как есть, но я их включу полностью для целостности файла) ---
+// --- API ЗАГРУЗКА ---
 async function loadAmoPipelines() {
     try {
-        const res = await fetch('/api/amocrm/pipelines');
-        if (!res.ok) throw new Error('Failed to load pipelines');
-        amocrmPipelines = await res.json();
-        const pSelect = document.getElementById('filterPipeline');
-        if (pSelect) {
-            pSelect.innerHTML = '<option value="all">Все воронки</option>';
-            amocrmPipelines.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.id;
-                opt.innerText = p.name;
-                pSelect.appendChild(opt);
-            });
-            pSelect.onchange = (e) => updateStageFilters(e.target.value);
+        // Загружаем воронки
+        const resP = await fetch('/api/amocrm/pipelines');
+        if (resP.ok) {
+            amocrmPipelines = await resP.json();
+            const pSelect = document.getElementById('filterPipeline');
+            if (pSelect) {
+                pSelect.innerHTML = '<option value="all">Все воронки</option>';
+                amocrmPipelines.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.innerText = p.name;
+                    pSelect.appendChild(opt);
+                });
+                pSelect.onchange = (e) => updateStageFilters(e.target.value);
+            }
+        }
+
+        // Загружаем пользователей (для фильтра менеджера)
+        const resU = await fetch('/api/users');
+        if (resU.ok) {
+            const users = await resU.json();
+            const uSelect = document.getElementById('filterManager');
+            if (uSelect) {
+                uSelect.innerHTML = '<option value="all">Все пользователи</option>';
+                users.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.id;
+                    opt.innerText = u.name;
+                    uSelect.appendChild(opt);
+                });
+                // По умолчанию выбираем текущего менеджера
+                if (currentUser) {
+                    uSelect.value = currentUser.id;
+                }
+            }
         }
     } catch (e) {
-        console.error('Pipelines error:', e);
+        console.error('Initial load error:', e);
     }
 }
 
@@ -395,10 +419,13 @@ window.resetFilters = function () {
     document.getElementById('searchSuggestions').classList.add('hidden');
     document.getElementById('filterPipeline').value = 'all';
     document.getElementById('filterStage').value = 'all';
+    document.getElementById('filterManager').value = currentUser ? currentUser.id : 'all';
+
     const input = document.getElementById('searchInput');
     input.placeholder = "Поиск сделок...";
     input.value = "";
     input.classList.remove('text-teal-600', 'font-bold');
+
     document.getElementById('searchResultsView').classList.add('hidden');
     document.getElementById('customerDetailsView').classList.remove('hidden');
     document.getElementById('callHistoryView').classList.remove('hidden');
@@ -407,15 +434,19 @@ window.resetFilters = function () {
 window.applyFilters = async function () {
     const pipelineId = document.getElementById('filterPipeline').value;
     const stageId = document.getElementById('filterStage').value;
+    const managerId = document.getElementById('filterManager').value;
     const term = document.getElementById('searchInput').value.toLowerCase();
     const tbody = document.getElementById('searchResultsTableBody');
+
+    // Показываем лоадер в кнопке или таблице
     tbody.innerHTML = '<tr><td colspan="4" class="p-10 text-center text-teal-600 font-bold"><i class="fa-solid fa-spinner fa-spin mr-2"></i>ЗАГРУЗКА ДАННЫХ...</td></tr>';
 
     try {
         let url = `/api/amocrm/leads?limit=250`;
         if (pipelineId !== 'all') url += `&pipeline_id=${pipelineId}`;
         if (stageId !== 'all') url += `&status_id=${stageId}`;
-        if (currentUser && currentUser.id !== 7751419) url += `&user_id=${currentUser.id}`;
+        if (managerId !== 'all') url += `&user_id=${managerId}`;
+        else if (currentUser && currentUser.id !== 7751419) url += `&user_id=${currentUser.id}`;
 
         const res = await fetch(url);
         if (!res.ok) throw new Error('API Error');
@@ -435,14 +466,27 @@ window.applyFilters = async function () {
                 price: lead.price || 0,
                 timestamp: lead.created_at * 1000
             };
-        }).filter(lead => {
-            const matchSearch = lead.contactName.toLowerCase().includes(term) ||
-                lead.phone.toLowerCase().includes(term);
-            return matchSearch;
         });
 
+        // Обновляем текст в поиске (breadcrumbs)
         const input = document.getElementById('searchInput');
-        input.classList.add('text-teal-600', 'font-bold');
+        let filterLabels = [];
+
+        if (pipelineId !== 'all') {
+            const p = amocrmPipelines.find(p => p.id == pipelineId);
+            if (p) filterLabels.push(p.name);
+        }
+        if (stageId !== 'all') {
+            const p = amocrmPipelines.find(p => p.id == pipelineId);
+            const s = p?._embedded?.statuses?.find(s => s.id == stageId);
+            if (s) filterLabels.push(s.name);
+        }
+
+        if (filterLabels.length > 0) {
+            input.value = filterLabels.join(' > ');
+            input.classList.add('text-teal-600', 'font-bold');
+        }
+
         document.getElementById('filterPanel').classList.add('hidden');
         document.getElementById('searchSuggestions').classList.add('hidden');
         document.getElementById('customerDetailsView').classList.add('hidden');
