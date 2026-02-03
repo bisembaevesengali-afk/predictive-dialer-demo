@@ -180,8 +180,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     loadAmoPipelines().then(() => console.log('Pipelines & Users loaded'));
 
-    // Заполняем очередь демо-данными для примера (если пустая)
-    if (queue.length === 0) queue = [...leadPool];
+    // ПРОВЕРКА: Если есть сохраненная очередь в localStorage, загружаем её
+    const savedQueue = localStorage.getItem(`queue_${currentUser.id}`);
+    if (savedQueue) {
+        queue = JSON.parse(savedQueue);
+    }
 
     applySorting();
     renderQueue();
@@ -251,13 +254,29 @@ function updateStageFilters(pipelineId) {
 
 function showLeadDetails(lead) {
     currentDisplayedLead = lead;
-    document.getElementById('mainName').innerText = lead.contactName;
-    document.getElementById('mainAvatar').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${lead.contactName}`;
-    document.getElementById('mainDate').innerText = lead.date;
-    document.getElementById('mainPipeline').innerText = lead.pipeline;
-    document.getElementById('mainPrice').innerText = `₸ ${lead.price}`;
-    document.getElementById('mainPhone').innerText = lead.phone;
-    document.getElementById('mainStage').innerText = lead.stage;
+    document.getElementById('mainName').innerText = lead.contactName || 'Без имени';
+    document.getElementById('mainAvatar').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(lead.contactName || 'Lead')}`;
+    document.getElementById('mainDate').innerText = lead.date || '—';
+    document.getElementById('mainPipeline').innerText = lead.pipeline || '—';
+    document.getElementById('mainPrice').innerText = `₸ ${lead.price || 0}`;
+    document.getElementById('mainPhone').innerText = lead.phone || 'Нет телефона';
+    document.getElementById('mainStage').innerText = lead.stage || '—';
+
+    // Ссылка на AmoCRM
+    const amoLinkContainer = document.getElementById('amoLinkContainer');
+    if (amoLinkContainer) {
+        if (lead.id && lead.id > 10) { // Если не демо (id > 10)
+            amoLinkContainer.innerHTML = `
+                <a href="${lead.link || '#'}" target="_blank" class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase hover:bg-teal-500 hover:text-white transition-all">
+                    <i class="fa-solid fa-external-link text-[10px]"></i>
+                    Открыть в AMO
+                </a>
+            `;
+        } else {
+            amoLinkContainer.innerHTML = '';
+        }
+    }
+
     renderCallHistory(lead);
 }
 
@@ -311,8 +330,8 @@ function handleLiveSearch(query) {
     suggestions.classList.remove('hidden');
     content.innerHTML = '';
     const cleanQuery = query.toLowerCase().replace(/\+/g, '').replace(/\s/g, '');
-    const dealMatches = leadPool.filter(l => l.contactName.toLowerCase().includes(query.toLowerCase()));
-    const phoneMatches = leadPool.filter(l => l.phone.replace(/\+/g, '').replace(/\s/g, '').includes(cleanQuery));
+    const dealMatches = leadPool.filter(l => (l.contactName || '').toLowerCase().includes(query.toLowerCase()));
+    const phoneMatches = leadPool.filter(l => (l.phone || '').replace(/\+/g, '').replace(/\s/g, '').includes(cleanQuery));
 
     if (dealMatches.length > 0) renderSection(content, 'СДЕЛКИ', dealMatches);
     if (phoneMatches.length > 0) {
@@ -335,7 +354,7 @@ function renderSection(content, title, items, isPhone = false) {
         row.innerHTML = `
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${item.contactName}" class="w-8 h-8 rounded-lg bg-slate-100">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(item.contactName)}" class="w-8 h-8 rounded-lg bg-slate-100">
                     <div>
                         <p class="text-sm font-bold text-slate-800 group-hover:text-teal-600 transition-colors">${item.contactName}</p>
                         <p class="text-[11px] text-slate-400 font-medium">${isPhone ? item.phone : item.pipeline}</p>
@@ -446,7 +465,6 @@ window.applyFilters = async function () {
         if (pipelineId !== 'all') url += `&pipeline_id=${pipelineId}`;
         if (stageId !== 'all') url += `&status_id=${stageId}`;
         if (managerId !== 'all') url += `&user_id=${managerId}`;
-        else if (currentUser && currentUser.id !== 7751419) url += `&user_id=${currentUser.id}`;
 
         const res = await fetch(url);
         if (!res.ok) throw new Error('API Error');
@@ -454,17 +472,22 @@ window.applyFilters = async function () {
 
         filteredResults = realLeads.map(lead => {
             let stageName = 'Неизвестно';
+            let pipelineName = '—';
             amocrmPipelines.forEach(p => {
                 const status = p._embedded?.statuses?.find(s => s.id == lead.status_id);
-                if (status) stageName = status.name;
+                if (status) {
+                    stageName = status.name;
+                    pipelineName = p.name;
+                }
             });
             return {
                 ...lead,
                 contactName: lead.contactName || lead.name || 'Без названия',
                 phone: lead.phone || 'Нет телефона',
                 stage: stageName,
+                pipeline: pipelineName,
                 price: lead.price || 0,
-                timestamp: lead.created_at * 1000
+                timestamp: Date.now() // Для новых загруженных ставим текущее время
             };
         });
 
@@ -515,7 +538,7 @@ function renderSearchResults() {
         tr.innerHTML = `
             <td class="p-4 pl-6">
                 <div class="flex items-center gap-3">
-                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${lead.contactName}" class="w-8 h-8 rounded-lg bg-slate-100">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(lead.contactName)}" class="w-8 h-8 rounded-lg bg-slate-100">
                     <div>
                         <p class="text-sm font-bold text-slate-800">${lead.contactName}</p>
                         <p class="text-[10px] text-slate-400 font-medium">${lead.phone}</p>
@@ -560,9 +583,34 @@ window.addSelectedToQueue = function () {
             queue.unshift({ ...sl, status: 'pending' });
         }
     });
+
+    // Сохраняем в локалсторадж
+    if (currentUser) {
+        localStorage.setItem(`queue_${currentUser.id}`, JSON.stringify(queue));
+    }
+
     applySorting();
     renderQueue();
     resetFilters();
+}
+
+window.removeFromQueue = function (id) {
+    queue = queue.filter(q => q.id !== id);
+    if (currentUser) {
+        localStorage.setItem(`queue_${currentUser.id}`, JSON.stringify(queue));
+    }
+    renderQueue();
+}
+
+window.clearQueue = function () {
+    if (queue.length === 0) return;
+    if (confirm('Очистить всю очередь?')) {
+        queue = [];
+        if (currentUser) {
+            localStorage.removeItem(`queue_${currentUser.id}`);
+        }
+        renderQueue();
+    }
 }
 
 function updateShiftTimer() {
@@ -580,11 +628,13 @@ function renderQueue() {
     const queueBudgetEl = document.getElementById('queueTotalBudget');
     if (!container) return;
     container.innerHTML = '';
+
     const sortedList = [...queue].sort((a, b) => {
         const priority = { 'dialing': 0, 'pending': 1, 'talked': 2, 'no-answer': 2 };
         if (priority[a.status] !== priority[b.status]) return priority[a.status] - priority[b.status];
         return b.timestamp - a.timestamp;
     });
+
     const pendingCount = queue.filter(l => l.status === 'pending' || l.status === 'dialing').length;
     counter.innerText = pendingCount;
     const totalBudget = queue.filter(l => l.status === 'pending' || l.status === 'dialing').reduce((sum, lead) => sum + parsePrice(lead.price), 0);
@@ -596,13 +646,14 @@ function renderQueue() {
         if (lead.status === 'dialing') classes += "border-amber-400 bg-amber-50 shadow-lg z-10 ";
         else if (lead.status === 'talked') classes += "opacity-75 bg-slate-50 border-slate-100 ";
         else if (lead.status === 'no-answer') classes += "opacity-75 bg-red-50/30 border-red-100 ";
-        else classes += "hover:border-teal-500/30 hover:shadow-xl ";
+        else classes += "hover:border-teal-50/30 hover:shadow-xl ";
         div.className = classes;
 
         let statusMark = '';
         if (lead.status === 'dialing') statusMark = '<span class="text-[10px] font-black text-amber-600 animate-pulse uppercase">Звоним...</span>';
         else if (lead.status === 'talked') statusMark = '<span class="text-[10px] font-black text-teal-600 uppercase"><i class="fa-solid fa-check-double mr-1"></i>Поговорили</span>';
         else if (lead.status === 'no-answer') statusMark = '<span class="text-[10px] font-black text-red-500 uppercase"><i class="fa-solid fa-phone-slash mr-1"></i>Нет ответа</span>';
+        else statusMark = `<span class="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[100px]">${lead.stage || 'В очереди'}</span>`;
 
         div.innerHTML = `
             <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -612,17 +663,19 @@ function renderQueue() {
             </div>
             <div class="flex justify-between items-start gap-2 mb-2">
                 <div class="flex items-center gap-3 min-w-0">
-                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${lead.contactName}" class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(lead.contactName)}" class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200">
                     <div class="min-w-0">
                         <h4 class="font-bold text-sm truncate ${lead.status === 'dialing' ? 'text-amber-900' : ''}">${lead.contactName}</h4>
                         <p class="text-[11px] text-slate-400 truncate">${lead.phone}</p>
                     </div>
                 </div>
-                <span class="text-[9px] font-bold text-slate-400 uppercase shrink-0">${lead.date}</span>
+                <span class="text-[9px] font-bold text-slate-400 uppercase shrink-0">${lead.date || 'Новая'}</span>
             </div>
             <div class="flex justify-between items-center mt-3">
                 <span class="text-[10px] font-bold bg-white text-slate-600 px-2 py-0.5 rounded border border-slate-100 shadow-sm">₸ ${lead.price}</span>
-                ${statusMark}
+                <div class="flex items-center gap-2">
+                    ${statusMark}
+                </div>
             </div>
         `;
         div.onclick = () => showLeadDetails(lead);
