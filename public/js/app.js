@@ -480,6 +480,16 @@ window.applyFilters = async function () {
                     pipelineName = p.name;
                 }
             });
+
+            // Форматирование даты создания (из timestamp AmoCRM)
+            const createdTimestamp = (lead.created_at || 0) * 1000;
+            const creationDate = new Date(createdTimestamp);
+            const dateStr = creationDate.toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            });
+
             return {
                 ...lead,
                 contactName: lead.contactName || lead.name || 'Без названия',
@@ -487,7 +497,8 @@ window.applyFilters = async function () {
                 stage: stageName,
                 pipeline: pipelineName,
                 price: lead.price || 0,
-                timestamp: Date.now() // Для новых загруженных ставим текущее время
+                timestamp: createdTimestamp, // Используем реальное время создания для сортировки
+                date: dateStr // Для отображения
             };
         });
 
