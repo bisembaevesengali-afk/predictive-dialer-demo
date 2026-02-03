@@ -35,6 +35,33 @@ class AmoCRM {
         }
     }
 
+    async getLeadById(leadId) {
+        try {
+            const response = await this.axios.get(`/leads/${leadId}?with=contacts`);
+            const lead = response.data;
+            const contact = await this.getMainContact(lead._embedded?.contacts || []);
+            return {
+                id: lead.id,
+                name: lead.name,
+                price: lead.price || 0,
+                status_id: lead.status_id,
+                pipeline_id: lead.pipeline_id,
+                responsible_user_id: lead.responsible_user_id,
+                created_at: lead.created_at || lead.createdAt || 0,
+                updated_at: lead.updated_at || lead.updatedAt || 0,
+                contactName: contact?.name || lead.name || 'Без имени',
+                phone: contact?.phone || null,
+                link: `https://${config.amocrm.subdomain}.amocrm.ru/leads/detail/${lead.id}`,
+                custom_fields_values: lead.custom_fields_values || [],
+                tags: lead._embedded?.tags || []
+            };
+        } catch (error) {
+            console.error('Error fetching lead by ID:', error.message);
+            return null;
+        }
+    }
+
+
     // Fetch leads with filters
     async findLeadsByStatus(statusId = null, pipelineId = null, userId = null, limit = 50) {
         try {

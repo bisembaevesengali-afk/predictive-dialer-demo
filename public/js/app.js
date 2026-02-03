@@ -267,7 +267,23 @@ const formatDate = (timestamp) => {
     });
 };
 
-function showLeadDetails(lead) {
+async function showLeadDetails(lead) {
+    if (!lead) return;
+
+    // Если это реальная сделка и у нас нет полных данных (полей/тегов) — подтягиваем их
+    if (lead.id && lead.id > 10 && (!lead.custom_fields_values || lead.custom_fields_values.length === 0)) {
+        try {
+            const res = await fetch(`/api/amocrm/leads/${lead.id}`);
+            if (res.ok) {
+                const fullLead = await res.json();
+                // Обогащаем текущий объект данными
+                Object.assign(lead, fullLead);
+            }
+        } catch (e) {
+            console.error('Failed to enrich lead data:', e);
+        }
+    }
+
     currentDisplayedLead = lead;
     document.getElementById('mainName').innerText = lead.contactName || lead.name || 'Без имени';
     document.getElementById('mainAvatar').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(lead.contactName || 'Lead')}`;

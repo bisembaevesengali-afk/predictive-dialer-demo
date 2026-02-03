@@ -184,6 +184,17 @@ app.get('/api/amocrm/leads', async (req, res) => {
     }
 });
 
+app.get('/api/amocrm/leads/:id', async (req, res) => {
+    try {
+        const lead = await amocrm.getLeadById(req.params.id);
+        if (!lead) return res.status(404).json({ error: 'Lead not found' });
+        res.json(lead);
+    } catch (error) {
+        logger.error('API /leads/:id error:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 app.post('/api/dialer/start', async (req, res) => {
     await dialer.start();
     res.json({ success: true });
