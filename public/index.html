@@ -483,6 +483,14 @@
 
     </div> <!-- CONTENT AREA -->
 
+    <script>
+        // Принудительная очистка старых данных (один раз)
+        if (!localStorage.getItem('v3_fix_dates_v2')) {
+            localStorage.clear();
+            localStorage.setItem('v3_fix_dates_v2', 'true');
+            window.location.reload();
+        }
+    </script>
     <script src="js/app.js"></script>
 </body>
 

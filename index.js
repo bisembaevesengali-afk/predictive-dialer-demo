@@ -173,8 +173,8 @@ app.get('/api/amocrm/leads', async (req, res) => {
         if (!leads || leads.length === 0) {
             console.log('Using MOCK Leads (Demo Mode)');
             leads = [
-                { id: 1, name: 'Демо: Сделка #1', price: 150000, status_id: status_id, contactName: 'Иван Тестовый', phone: '+77770000001', link: '#', created_at: Math.floor(Date.now() / 1000) - 86400 },
-                { id: 2, name: 'Демо: Сделка #2', price: 80000, status_id: status_id, contactName: 'Мария Примерная', phone: '+77770000002', link: '#', created_at: Math.floor(Date.now() / 1000) - 3600 }
+                { id: 1, name: 'Демо: Сделка #1', price: 150000, status_id: status_id, contactName: 'Иван Тестовый', phone: '+77770000001', link: '#', created_at: Math.floor(Date.now() / 1000) - 86400, created_at_formatted: '2 фев. 26 г.' },
+                { id: 2, name: 'Демо: Сделка #2', price: 80000, status_id: status_id, contactName: 'Мария Примерная', phone: '+77770000002', link: '#', created_at: Math.floor(Date.now() / 1000) - 3600, created_at_formatted: '3 фев. 26 г.' }
             ];
         }
         res.json(leads);

@@ -95,6 +95,7 @@ class AmoCRM {
                     pipeline_id: lead.pipeline_id,
                     responsible_user_id: lead.responsible_user_id,
                     created_at: lead.created_at || lead.createdAt || 0,
+                    created_at_formatted: new Date((lead.created_at || lead.createdAt || 0) * 1000).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: '2-digit' }) + ' г.',
                     contactName: contact?.name || lead.name || 'Без имени',
                     phone: contact?.phone || null,
                     link: `https://${config.amocrm.subdomain}.amocrm.ru/leads/detail/${lead.id}`
@@ -110,21 +111,21 @@ class AmoCRM {
     }
 
     async getMainContact(contacts) {
-        if (!contacts || contacts.length === 0) return null;
+        if (!contacts || !contacts.length) return null;
         try {
-            // Fetch first contact details to get phone
             const contactId = contacts[0].id;
             const response = await this.axios.get(`/contacts/${contactId}`);
             const contact = response.data;
 
-            const phoneField = contact.custom_fields_values?.find(f => f.field_code === 'PHONE');
-            const phone = phoneField ? phoneField.values[0].value : null;
+            const phoneField = contact.custom_fields_values?.find(f => f.field_code === 'PHONE' || f.field_id === 1057329 || f.field_name?.toUpperCase() === 'ТЕЛЕФОН');
+            const phone = phoneField?.values?.[0]?.value || null;
 
             return {
-                name: contact.name,
+                name: contact.name || 'Без имени',
                 phone: phone
             };
         } catch (error) {
+            console.error(`Contact fetch error for ID ${contacts[0].id}:`, error.message);
             return null;
         }
     }

@@ -252,31 +252,39 @@ function updateStageFilters(pipelineId) {
     }
 }
 
-const formatDate = (timestamp) => {
+const formatDate = (timestamp, lead = null) => {
+    if (lead && lead.created_at_formatted) return lead.created_at_formatted;
     if (!timestamp || timestamp === 0) return '—';
-    // AmoCRM использует секунды (10 знаков), JS использует миллисекунды (13 знаков)
-    const ts = timestamp > 10000000000 ? timestamp : timestamp * 1000;
-    const date = new Date(ts);
 
-    if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return '—';
+    // Если это уже отформатированная строка (например, из старых данных или моков)
+    if (typeof timestamp === 'string' && timestamp.includes('.')) return timestamp;
 
-    return date.toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'short',
-        year: '2-digit'
-    }) + ' г.';
+    try {
+        // AmoCRM использует секунды (10 знаков), JS использует миллисекунды (13 знаков)
+        const ts = Number(timestamp) > 10000000000 ? Number(timestamp) : Number(timestamp) * 1000;
+        const date = new Date(ts);
+
+        if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return '—';
+
+        return date.toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'short',
+            year: '2-digit'
+        }) + ' г.';
+    } catch (e) {
+        return '—';
+    }
 };
 
 async function showLeadDetails(lead) {
     if (!lead) return;
 
-    // Если это реальная сделка и у нас нет полных данных — подтягиваем их (для уверенности в created_at)
-    if (lead.id && lead.id > 10 && (!lead.created_at && !lead.createdAt && !lead.timestamp)) {
+    // Если это реальная сделка и у нас нет вообще никаких данных о дате — пробуем подтянуть
+    if (lead.id && lead.id > 10 && (!lead.created_at && !lead.createdAt && !lead.timestamp && !lead.date)) {
         try {
             const res = await fetch(`/api/amocrm/leads/${lead.id}`);
             if (res.ok) {
                 const fullLead = await res.json();
-                // Обогащаем текущий объект данными
                 Object.assign(lead, fullLead);
             }
         } catch (e) {
@@ -288,10 +296,9 @@ async function showLeadDetails(lead) {
     document.getElementById('mainName').innerText = lead.contactName || lead.name || 'Без имени';
     document.getElementById('mainAvatar').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(lead.contactName || 'Lead')}`;
 
-    // Пытаемся взять сырой timestamp и форматируем его
-    const rawTs = lead.created_at || lead.createdAt || lead.timestamp;
-    const displayDate = formatDate(rawTs);
-    document.getElementById('mainDate').innerText = displayDate;
+    // Пытаемся взять сырой timestamp или готовую строку date
+    const displayDate = formatDate(lead.created_at || lead.createdAt || lead.timestamp, lead) || lead.date || '—';
+    document.getElementById('mainDate').innerText = displayDate === '0' ? '—' : displayDate;
 
     document.getElementById('mainPipeline').innerText = lead.pipeline || '—';
     document.getElementById('mainPrice').innerText = `₸ ${lead.price || 0}`;
@@ -528,7 +535,7 @@ window.applyFilters = async function () {
                 pipeline: pipelineName,
                 price: lead.price || 0,
                 timestamp: createdTimestamp,
-                date: formatDate(createdTimestamp)
+                date: formatDate(createdTimestamp || lead.created_at || lead.createdAt, lead)
             };
         });
 
@@ -694,13 +701,12 @@ function renderQueue() {
         else classes += "hover:border-teal-50/30 hover:shadow-xl ";
         div.className = classes;
 
-        let statusMark = '';
-        if (lead.status === 'dialing') statusMark = '<span class="text-[10px] font-black text-amber-600 animate-pulse uppercase">Звоним...</span>';
-        else if (lead.status === 'talked') statusMark = '<span class="text-[10px] font-black text-teal-600 uppercase"><i class="fa-solid fa-check-double mr-1"></i>Поговорили</span>';
-        else if (lead.status === 'no-answer') statusMark = '<span class="text-[10px] font-black text-red-500 uppercase"><i class="fa-solid fa-phone-slash mr-1"></i>Нет ответа</span>';
-        else statusMark = `<span class="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[100px]">${lead.stage || 'В очереди'}</span>`;
+        const statusMark = (lead.status === 'dialing') ? '<span class="text-[10px] font-black text-amber-600 animate-pulse uppercase">Звоним...</span>' :
+            (lead.status === 'talked') ? '<span class="text-[10px] font-black text-teal-600 uppercase"><i class="fa-solid fa-check-double mr-1"></i>Поговорили</span>' :
+                (lead.status === 'no-answer') ? '<span class="text-[10px] font-black text-red-500 uppercase"><i class="fa-solid fa-phone-slash mr-1"></i>Нет ответа</span>' :
+                    `<span class="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[100px]">${lead.stage || 'В очереди'}</span>`;
 
-        const displayDate = formatDate(lead.created_at || lead.timestamp);
+        const displayDate = formatDate(lead.created_at || lead.createdAt || lead.timestamp, lead) || lead.date || '—';
 
         div.innerHTML = `
             <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
