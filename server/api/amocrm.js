@@ -59,16 +59,17 @@ class AmoCRM {
 
             // Format leads for Dialer
             const formattedLeads = await Promise.all(leads.map(async (lead) => {
-                const contact = await this.getMainContact(lead._embedded.contacts);
+                const contact = await this.getMainContact(lead._embedded?.contacts || []);
                 return {
                     id: lead.id,
                     name: lead.name,
-                    price: lead.price,
+                    price: lead.price || 0,
                     status_id: lead.status_id,
                     pipeline_id: lead.pipeline_id,
                     responsible_user_id: lead.responsible_user_id,
-                    created_at: lead.created_at, // Важно для фронтенда!
-                    contactName: contact?.name || 'Unknown',
+                    created_at: lead.created_at || lead.createdAt || 0,
+                    updated_at: lead.updated_at || lead.updatedAt || 0,
+                    contactName: contact?.name || lead.name || 'Без имени',
                     phone: contact?.phone || null,
                     link: `https://${config.amocrm.subdomain}.amocrm.ru/leads/detail/${lead.id}`
                 };

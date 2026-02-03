@@ -48,7 +48,7 @@ checkAuth();
 // --- БАЗА ДАННЫХ ДЛЯ ПОИСКА (Демо-данные) ---
 const leadPool = [
     {
-        id: 1, contactName: 'Арман Сериков', phone: '+7 701 111 22 33', price: '450 000', date: '01.02.2024', timestamp: 1706745600000,
+        id: 1, contactName: 'Арман Сериков', phone: '+7 701 111 22 33', price: '450 000', created_at: 1706745600,
         status: 'pending', pipeline: 'Продажи', stage: 'Первичный контакт', responsible_user_id: 100,
         calls: [
             { date: '01.02.2024 14:20', status: 'success', duration: '02:15' },
@@ -56,14 +56,14 @@ const leadPool = [
         ]
     },
     {
-        id: 2, contactName: 'Donna Greene', phone: '+1 202 555 0123', price: '268', date: '08.02.2023', timestamp: 1675814400000,
+        id: 2, contactName: 'Donna Greene', phone: '+1 202 555 0123', price: '268', created_at: 1675814400,
         status: 'pending', pipeline: 'Продажи', stage: 'Переговоры', responsible_user_id: 200,
         calls: [
             { date: '08.02.2023 11:30', status: 'success', duration: '05:40' }
         ]
     },
     {
-        id: 3, contactName: 'Берик Ахметов', phone: '+7 777 333 44 55', price: '120 000', date: 'Вчера', timestamp: Date.now() - 86400000,
+        id: 3, contactName: 'Берик Ахметов', phone: '+7 777 333 44 55', price: '120 000', created_at: Math.floor(Date.now() / 1000) - 86400,
         status: 'pending', pipeline: 'Холодный обзвон', stage: 'Первичный контакт', responsible_user_id: 100,
         calls: [
             { date: 'Вчера 16:45', status: 'busy', duration: '00:00' }
@@ -252,11 +252,31 @@ function updateStageFilters(pipelineId) {
     }
 }
 
+const formatDate = (timestamp) => {
+    if (!timestamp) return '—';
+    // AmoCRM использует секунды, JS использует миллисекунды
+    const date = new Date(timestamp > 10000000000 ? timestamp : timestamp * 1000);
+    if (isNaN(date.getTime())) return '—';
+
+    // Если дата 1970 - значит данных нет
+    if (date.getFullYear() <= 1970) return '—';
+
+    return date.toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+};
+
 function showLeadDetails(lead) {
     currentDisplayedLead = lead;
-    document.getElementById('mainName').innerText = lead.contactName || 'Без имени';
+    document.getElementById('mainName').innerText = lead.contactName || lead.name || 'Без имени';
     document.getElementById('mainAvatar').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(lead.contactName || 'Lead')}`;
-    document.getElementById('mainDate').innerText = lead.date || '—';
+
+    // Пытаемся взять готовую дату или форматируем из timestamp
+    const displayDate = lead.date || formatDate(lead.created_at || lead.timestamp);
+    document.getElementById('mainDate').innerText = displayDate;
+
     document.getElementById('mainPipeline').innerText = lead.pipeline || '—';
     document.getElementById('mainPrice').innerText = `₸ ${lead.price || 0}`;
     document.getElementById('mainPhone').innerText = lead.phone || 'Нет телефона';
@@ -265,7 +285,7 @@ function showLeadDetails(lead) {
     // Ссылка на AmoCRM
     const amoLinkContainer = document.getElementById('amoLinkContainer');
     if (amoLinkContainer) {
-        if (lead.id && lead.id > 10) { // Если не демо (id > 10)
+        if (lead.id && lead.id > 10) {
             amoLinkContainer.innerHTML = `
                 <a href="${lead.link || '#'}" target="_blank" class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase hover:bg-teal-500 hover:text-white transition-all">
                     <i class="fa-solid fa-external-link text-[10px]"></i>
@@ -481,14 +501,8 @@ window.applyFilters = async function () {
                 }
             });
 
-            // Форматирование даты создания (из timestamp AmoCRM)
-            const createdTimestamp = (lead.created_at || 0) * 1000;
-            const creationDate = new Date(createdTimestamp);
-            const dateStr = creationDate.toLocaleDateString('ru-RU', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric'
-            });
+            // Используем timestamp AmoCRM
+            const createdTimestamp = (lead.created_at || lead.createdAt || 0);
 
             return {
                 ...lead,
@@ -497,8 +511,8 @@ window.applyFilters = async function () {
                 stage: stageName,
                 pipeline: pipelineName,
                 price: lead.price || 0,
-                timestamp: createdTimestamp, // Используем реальное время создания для сортировки
-                date: dateStr // Для отображения
+                timestamp: createdTimestamp,
+                date: formatDate(createdTimestamp)
             };
         });
 
