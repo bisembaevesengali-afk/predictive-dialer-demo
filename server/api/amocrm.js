@@ -35,13 +35,20 @@ class AmoCRM {
         }
     }
 
-    // Fetch leads from a specific status (e.g., "Initial Contact")
-    // If statusId is null, fetches all active leads (limit 50)
-    async findLeadsByStatus(statusId = null, limit = 50) {
+    // Fetch leads with filters
+    async findLeadsByStatus(statusId = null, pipelineId = null, userId = null, limit = 50) {
         try {
             let url = `/leads?limit=${limit}&with=contacts`;
-            if (statusId) {
-                url += `&filter[statuses][0][pipeline_id]=&filter[statuses][0][status_id]=${statusId}`;
+
+            // Фильтры
+            if (statusId && statusId !== 'all') {
+                url += `&filter[statuses][0][status_id]=${statusId}`;
+            }
+            if (pipelineId && pipelineId !== 'all') {
+                url += `&filter[pipeline_id][0]=${pipelineId}`;
+            }
+            if (userId && userId !== 'all') {
+                url += `&filter[responsible_user_id][0]=${userId}`;
             }
 
             const response = await this.axios.get(url);
@@ -58,6 +65,9 @@ class AmoCRM {
                     name: lead.name,
                     price: lead.price,
                     status_id: lead.status_id,
+                    pipeline_id: lead.pipeline_id,
+                    responsible_user_id: lead.responsible_user_id,
+                    created_at: lead.created_at, // Важно для фронтенда!
                     contactName: contact?.name || 'Unknown',
                     phone: contact?.phone || null,
                     link: `https://${config.amocrm.subdomain}.amocrm.ru/leads/detail/${lead.id}`
@@ -67,7 +77,7 @@ class AmoCRM {
             // Filter out leads without phone numbers
             return formattedLeads.filter(l => l.phone);
         } catch (error) {
-            console.error('Error finding leads:', error.message);
+            console.error('Error finding leads:', error.response?.data || error.message);
             return [];
         }
     }
