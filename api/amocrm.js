@@ -78,12 +78,15 @@ class AmoCRM {
             let url = `/leads?limit=${limit}&with=contacts`;
 
             // Фильтры
-            if (statusId && statusId !== 'all') {
+            if (pipelineId && pipelineId !== 'all') {
+                url += `&filter[statuses][0][pipeline_id]=${pipelineId}`;
+                if (statusId && statusId !== 'all') {
+                    url += `&filter[statuses][0][status_id]=${statusId}`;
+                }
+            } else if (statusId && statusId !== 'all') {
                 url += `&filter[statuses][0][status_id]=${statusId}`;
             }
-            if (pipelineId && pipelineId !== 'all') {
-                url += `&filter[pipeline_id][0]=${pipelineId}`;
-            }
+
             if (userId && userId !== 'all') {
                 url += `&filter[responsible_user_id][0]=${userId}`;
             }
