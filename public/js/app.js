@@ -298,42 +298,6 @@ async function showLeadDetails(lead) {
     document.getElementById('mainPhone').innerText = lead.phone || 'Нет телефона';
     document.getElementById('mainStage').innerText = lead.stage || '—';
 
-    // Рендерим теги
-    const stageContainer = document.getElementById('mainStage').parentElement;
-    // Удаляем старые теги (если были добавлены динамически)
-    const oldTags = stageContainer.querySelectorAll('.lead-tag-badge');
-    oldTags.forEach(t => t.remove());
-
-    const tags = lead.tags || [];
-    tags.forEach(tag => {
-        const tagSpan = document.createElement('span');
-        tagSpan.className = 'lead-tag-badge px-2 py-0.5 bg-slate-100 text-slate-500 text-[8px] font-bold uppercase rounded-md border border-slate-200 ml-2';
-        tagSpan.innerText = tag.name;
-        stageContainer.appendChild(tagSpan);
-    });
-
-    // Рендерим доп. поля
-    const cfContainer = document.getElementById('customFieldsContainer');
-    if (cfContainer) {
-        cfContainer.innerHTML = '';
-        const fields = lead.custom_fields_values || [];
-
-        if (fields.length > 0) {
-            cfContainer.classList.remove('hidden');
-            fields.forEach(f => {
-                const val = f.values && f.values[0] ? f.values[0].value : '—';
-                const fieldDiv = document.createElement('div');
-                fieldDiv.innerHTML = `
-                    <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-1">${f.field_name}</p>
-                    <p class="text-xs font-bold text-slate-600 truncate" title="${val}">${val}</p>
-                `;
-                cfContainer.appendChild(fieldDiv);
-            });
-        } else {
-            cfContainer.classList.add('hidden');
-        }
-    }
-
     // Ссылка на AmoCRM
     const amoLinkContainer = document.getElementById('amoLinkContainer');
     if (amoLinkContainer) {
