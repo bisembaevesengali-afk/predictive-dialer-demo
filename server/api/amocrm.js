@@ -95,12 +95,9 @@ class AmoCRM {
                     pipeline_id: lead.pipeline_id,
                     responsible_user_id: lead.responsible_user_id,
                     created_at: lead.created_at || lead.createdAt || 0,
-                    updated_at: lead.updated_at || lead.updatedAt || 0,
                     contactName: contact?.name || lead.name || 'Без имени',
                     phone: contact?.phone || null,
-                    link: `https://${config.amocrm.subdomain}.amocrm.ru/leads/detail/${lead.id}`,
-                    custom_fields_values: lead.custom_fields_values || [],
-                    tags: lead._embedded?.tags || []
+                    link: `https://${config.amocrm.subdomain}.amocrm.ru/leads/detail/${lead.id}`
                 };
             }));
 

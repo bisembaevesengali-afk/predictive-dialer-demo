@@ -263,15 +263,15 @@ const formatDate = (timestamp) => {
     return date.toLocaleDateString('ru-RU', {
         day: 'numeric',
         month: 'short',
-        year: 'numeric'
-    });
+        year: '2-digit'
+    }) + ' г.';
 };
 
 async function showLeadDetails(lead) {
     if (!lead) return;
 
-    // Если это реальная сделка и у нас нет полных данных (полей/тегов) — подтягиваем их
-    if (lead.id && lead.id > 10 && (!lead.custom_fields_values || lead.custom_fields_values.length === 0)) {
+    // Если это реальная сделка и у нас нет полных данных — подтягиваем их (для уверенности в created_at)
+    if (lead.id && lead.id > 10 && (!lead.created_at && !lead.createdAt && !lead.timestamp)) {
         try {
             const res = await fetch(`/api/amocrm/leads/${lead.id}`);
             if (res.ok) {
