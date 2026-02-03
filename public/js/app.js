@@ -253,13 +253,12 @@ function updateStageFilters(pipelineId) {
 }
 
 const formatDate = (timestamp) => {
-    if (!timestamp) return '—';
-    // AmoCRM использует секунды, JS использует миллисекунды
-    const date = new Date(timestamp > 10000000000 ? timestamp : timestamp * 1000);
-    if (isNaN(date.getTime())) return '—';
+    if (!timestamp || timestamp === 0) return '—';
+    // AmoCRM использует секунды (10 знаков), JS использует миллисекунды (13 знаков)
+    const ts = timestamp > 10000000000 ? timestamp : timestamp * 1000;
+    const date = new Date(ts);
 
-    // Если дата 1970 - значит данных нет
-    if (date.getFullYear() <= 1970) return '—';
+    if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return '—';
 
     return date.toLocaleDateString('ru-RU', {
         day: 'numeric',
@@ -273,8 +272,9 @@ function showLeadDetails(lead) {
     document.getElementById('mainName').innerText = lead.contactName || lead.name || 'Без имени';
     document.getElementById('mainAvatar').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(lead.contactName || 'Lead')}`;
 
-    // Пытаемся взять готовую дату или форматируем из timestamp
-    const displayDate = lead.date || formatDate(lead.created_at || lead.timestamp);
+    // Пытаемся взять сырой timestamp и форматируем его
+    const rawTs = lead.created_at || lead.createdAt || lead.timestamp;
+    const displayDate = formatDate(rawTs);
     document.getElementById('mainDate').innerText = displayDate;
 
     document.getElementById('mainPipeline').innerText = lead.pipeline || '—';
@@ -282,12 +282,48 @@ function showLeadDetails(lead) {
     document.getElementById('mainPhone').innerText = lead.phone || 'Нет телефона';
     document.getElementById('mainStage').innerText = lead.stage || '—';
 
+    // Рендерим теги
+    const stageContainer = document.getElementById('mainStage').parentElement;
+    // Удаляем старые теги (если были добавлены динамически)
+    const oldTags = stageContainer.querySelectorAll('.lead-tag-badge');
+    oldTags.forEach(t => t.remove());
+
+    const tags = lead.tags || [];
+    tags.forEach(tag => {
+        const tagSpan = document.createElement('span');
+        tagSpan.className = 'lead-tag-badge px-2 py-0.5 bg-slate-100 text-slate-500 text-[8px] font-bold uppercase rounded-md border border-slate-200 ml-2';
+        tagSpan.innerText = tag.name;
+        stageContainer.appendChild(tagSpan);
+    });
+
+    // Рендерим доп. поля
+    const cfContainer = document.getElementById('customFieldsContainer');
+    if (cfContainer) {
+        cfContainer.innerHTML = '';
+        const fields = lead.custom_fields_values || [];
+
+        if (fields.length > 0) {
+            cfContainer.classList.remove('hidden');
+            fields.forEach(f => {
+                const val = f.values && f.values[0] ? f.values[0].value : '—';
+                const fieldDiv = document.createElement('div');
+                fieldDiv.innerHTML = `
+                    <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-1">${f.field_name}</p>
+                    <p class="text-xs font-bold text-slate-600 truncate" title="${val}">${val}</p>
+                `;
+                cfContainer.appendChild(fieldDiv);
+            });
+        } else {
+            cfContainer.classList.add('hidden');
+        }
+    }
+
     // Ссылка на AmoCRM
     const amoLinkContainer = document.getElementById('amoLinkContainer');
     if (amoLinkContainer) {
         if (lead.id && lead.id > 10) {
             amoLinkContainer.innerHTML = `
-                <a href="${lead.link || '#'}" target="_blank" class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase hover:bg-teal-500 hover:text-white transition-all">
+                <a href="${lead.link || '#'}" target="_blank" class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase hover:bg-teal-50/20 hover:text-teal-600 transition-all">
                     <i class="fa-solid fa-external-link text-[10px]"></i>
                     Открыть в AMO
                 </a>
@@ -566,7 +602,11 @@ function renderSearchResults() {
                     <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(lead.contactName)}" class="w-8 h-8 rounded-lg bg-slate-100">
                     <div>
                         <p class="text-sm font-bold text-slate-800">${lead.contactName}</p>
-                        <p class="text-[10px] text-slate-400 font-medium">${lead.phone}</p>
+                        <div class="flex items-center gap-2">
+                            <p class="text-[10px] text-slate-400 font-medium">${lead.phone}</p>
+                            <span class="text-[8px] text-slate-300">•</span>
+                            <p class="text-[10px] text-slate-400 font-medium">${lead.date || '—'}</p>
+                        </div>
                     </div>
                 </div>
             </td>
@@ -680,6 +720,8 @@ function renderQueue() {
         else if (lead.status === 'no-answer') statusMark = '<span class="text-[10px] font-black text-red-500 uppercase"><i class="fa-solid fa-phone-slash mr-1"></i>Нет ответа</span>';
         else statusMark = `<span class="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[100px]">${lead.stage || 'В очереди'}</span>`;
 
+        const displayDate = formatDate(lead.created_at || lead.timestamp);
+
         div.innerHTML = `
             <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                 <button onclick="event.stopPropagation(); removeFromQueue(${lead.id})" class="w-6 h-6 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all">
@@ -694,7 +736,7 @@ function renderQueue() {
                         <p class="text-[11px] text-slate-400 truncate">${lead.phone}</p>
                     </div>
                 </div>
-                <span class="text-[9px] font-bold text-slate-400 uppercase shrink-0">${lead.date || 'Новая'}</span>
+                <span class="text-[9px] font-bold text-slate-400 uppercase shrink-0">${displayDate}</span>
             </div>
             <div class="flex justify-between items-center mt-3">
                 <span class="text-[10px] font-bold bg-white text-slate-600 px-2 py-0.5 rounded border border-slate-100 shadow-sm">₸ ${lead.price}</span>
